@@ -41,7 +41,8 @@ import {
   fetchWalletData, 
   fetchTransactions,
   invalidateUserCache,
-  dataCache
+  dataCache,
+  createTransactionAndAdjustWallet
 } from '@/lib/data-cache';
 
 interface WalletData {
@@ -194,15 +195,19 @@ const Wallet = () => {
         }
       }
 
-      // Create transaction
-      const transRef = push(ref(database, `transactions/${profile.uid}`));
-      await set(transRef, {
+      // Create transaction and adjust wallet atomically
+      const transaction = {
         type: 'add_money',
         amount,
         status: 'pending',
         description: 'Add money request',
         upiTransactionId: addMoneyForm.upiTransactionId,
         createdAt: Date.now(),
+      };
+
+      // Update wallet to reflect pending add money
+      await createTransactionAndAdjustWallet(profile.uid, transaction, {
+        pendingAddMoney: amount
       });
 
       // Create admin request
@@ -215,7 +220,7 @@ const Wallet = () => {
         upiTransactionId: addMoneyForm.upiTransactionId,
         status: 'pending',
         createdAt: Date.now(),
-        transactionId: transRef.key,
+        transactionId: requestRef.key, // Use the admin request ID as transactionId
       });
 
       toast({
@@ -226,8 +231,7 @@ const Wallet = () => {
       setAddMoneyOpen(false);
       setAddMoneyForm({ amount: '', upiTransactionId: '' });
       
-      // Invalidate cache and refetch data
-      invalidateUserCache(profile.uid);
+      // Refetch data
       const updatedWallet = await fetchWalletData(profile.uid);
       if (updatedWallet) {
         setWallet(updatedWallet);
@@ -321,15 +325,18 @@ const Wallet = () => {
         }
       }
 
-      // Create transaction
-      const transRef = push(ref(database, `transactions/${profile.uid}`));
-      await set(transRef, {
+      // Create transaction and adjust wallet atomically
+      const transaction = {
         type: 'withdrawal',
         amount,
         status: 'pending',
         description: 'Withdrawal request',
         upiId: withdrawForm.upiId,
         createdAt: Date.now(),
+      };
+
+      await createTransactionAndAdjustWallet(profile.uid, transaction, {
+        earnedBalance: -amount // Deduct from earned balance
       });
 
       // Create admin request
@@ -342,7 +349,7 @@ const Wallet = () => {
         upiId: withdrawForm.upiId,
         status: 'pending',
         createdAt: Date.now(),
-        transactionId: transRef.key,
+        transactionId: requestRef.key, // Use the admin request ID as transactionId
       });
 
       toast({
@@ -353,8 +360,7 @@ const Wallet = () => {
       setWithdrawOpen(false);
       setWithdrawForm({ amount: '', upiId: '' });
       
-      // Invalidate cache and refetch data
-      invalidateUserCache(profile.uid);
+      // Refetch data
       const updatedWallet = await fetchWalletData(profile.uid);
       if (updatedWallet) {
         setWallet(updatedWallet);

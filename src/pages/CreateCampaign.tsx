@@ -13,6 +13,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Loader2, IndianRupee, AlertTriangle } from 'lucide-react';
+import { deductCampaignBudget } from '@/lib/data-cache';
 
 const CreateCampaign = () => {
   const { profile } = useAuth();
@@ -108,6 +109,7 @@ const CreateCampaign = () => {
         }
       }
 
+      // Create campaign
       const campaignRef = push(ref(database, 'campaigns'));
       await set(campaignRef, {
         title: form.title,
@@ -125,10 +127,20 @@ const CreateCampaign = () => {
         createdAt: Date.now(),
       });
 
-      // Deduct from wallet
-      await update(ref(database, `wallets/${profile.uid}`), {
-        addedBalance: walletBalance - totalCost,
-      });
+      // Use atomic operation to deduct from wallet and update campaign budget
+      const success = await deductCampaignBudget(campaignRef.key, totalCost, profile.uid);
+      
+      if (!success) {
+        // If the atomic operation failed, remove the campaign
+        await update(ref(database, `campaigns/${campaignRef.key}`), { status: 'failed' });
+        toast({ 
+          title: 'Campaign Creation Failed', 
+          description: 'Failed to update wallet balance. Please try again.', 
+          variant: 'destructive' 
+        });
+        setLoading(false);
+        return;
+      }
 
       toast({ title: 'Campaign Created!', description: 'Your campaign is now live.' });
       navigate('/campaigns');
