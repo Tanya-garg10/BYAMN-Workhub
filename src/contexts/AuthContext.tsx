@@ -10,6 +10,7 @@ import {
 } from 'firebase/auth';
 import { ref, set, get, child, update } from 'firebase/database';
 import { auth, database } from '@/lib/firebase';
+import { sanitizeInput, isValidUrl } from '@/lib/utils';
 
 interface UserProfile {
   uid: string;
@@ -134,7 +135,46 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const updateProfile = async (data: Partial<UserProfile>) => {
     if (!user) return;
-    await update(ref(database, `users/${user.uid}`), data);
+    
+    // Sanitize profile data to prevent XSS and injection attacks
+    const sanitizedData: Partial<UserProfile> = {};
+    
+    if (data.fullName) {
+      sanitizedData.fullName = sanitizeInput(data.fullName);
+    }
+    
+    if (data.bio) {
+      sanitizedData.bio = sanitizeInput(data.bio);
+    }
+    
+    if (data.profileImage) {
+      // Validate URL before saving
+      if (isValidUrl(data.profileImage)) {
+        sanitizedData.profileImage = data.profileImage;
+      }
+    }
+    
+    if (data.socialLinks) {
+      sanitizedData.socialLinks = {};
+      
+      if (data.socialLinks.linkedin && isValidUrl(data.socialLinks.linkedin)) {
+        sanitizedData.socialLinks.linkedin = data.socialLinks.linkedin;
+      }
+      if (data.socialLinks.twitter && isValidUrl(data.socialLinks.twitter)) {
+        sanitizedData.socialLinks.twitter = data.socialLinks.twitter;
+      }
+      if (data.socialLinks.instagram && isValidUrl(data.socialLinks.instagram)) {
+        sanitizedData.socialLinks.instagram = data.socialLinks.instagram;
+      }
+      if (data.socialLinks.youtube && isValidUrl(data.socialLinks.youtube)) {
+        sanitizedData.socialLinks.youtube = data.socialLinks.youtube;
+      }
+      if (data.socialLinks.other && isValidUrl(data.socialLinks.other)) {
+        sanitizedData.socialLinks.other = data.socialLinks.other;
+      }
+    }
+    
+    await update(ref(database, `users/${user.uid}`), sanitizedData);
     await fetchProfile(user.uid);
   };
 

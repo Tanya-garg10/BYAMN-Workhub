@@ -11,6 +11,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import {
     Table,
     TableBody,
     TableCell,
@@ -39,6 +49,7 @@ interface UserData {
     isBlocked: boolean;
     earnedMoney: number;
     addedMoney: number;
+    profileImage?: string;
 }
 
 interface CampaignData {
@@ -79,6 +90,7 @@ const AdminDashboard = () => {
     const { profile } = useAuth();
     const { toast } = useToast();
     const [loading, setLoading] = useState(true);
+    const [imageUpdateUrl, setImageUpdateUrl] = useState<Record<string, string>>({});
 
     const [stats, setStats] = useState({
         totalUsers: 0,
@@ -195,6 +207,23 @@ const AdminDashboard = () => {
         }
     };
 
+    const handleProfileImageUpdate = async (userId: string, newImageUrl: string) => {
+        try {
+            await update(ref(database, `users/${userId}`), {
+                profileImage: newImageUrl || null
+            });
+            toast({ title: "Profile Image Updated Successfully" });
+            fetchAllData();
+        } catch (error) {
+            toast({ title: "Failed to Update Profile Image", variant: "destructive" });
+        }
+    };
+
+    const handleProfileImageUpdateSubmit = (userId: string) => {
+        const imageUrl = imageUpdateUrl[userId] || '';
+        handleProfileImageUpdate(userId, imageUrl);
+    };
+
     const handleCampaignAction = async (campaignId: string, action: 'delete' | 'pause' | 'resume') => {
         if (!confirm(`Are you sure you want to ${action} this campaign?`)) return;
 
@@ -218,7 +247,7 @@ const AdminDashboard = () => {
         try {
             // Update work status path: works/{userId}/{workId}
             await update(ref(database, `works/${work.userId}/${work.id}`), {
-                status: action === 'approved' ? 'approved' : 'rejected' // Fix: 'approved' not 'approve'
+                status: action === 'approve' ? 'approved' : 'rejected'
             });
 
             if (action === 'approve') {
@@ -250,12 +279,12 @@ const AdminDashboard = () => {
 
             // Update request status
             await update(ref(database, `${path}/${req.id}`), {
-                status: action === 'approved' ? 'approved' : 'rejected'
+                status: action === 'approve' ? 'approved' : 'rejected'
             });
 
             // Update transaction status
             await update(ref(database, `transactions/${req.userId}/${req.transactionId}`), {
-                status: action === 'approved' ? (req.type === 'add_money' ? 'approved' : 'paid') : 'rejected'
+                status: action === 'approve' ? (req.type === 'add_money' ? 'approved' : 'paid') : 'rejected'
             });
 
             if (action === 'approve') {
@@ -495,13 +524,50 @@ const AdminDashboard = () => {
                                                 </TableCell>
                                                 <TableCell>
                                                     {user.role !== 'admin' && (
-                                                        <Button
-                                                            size="sm"
-                                                            variant={user.isBlocked ? "outline" : "destructive"}
-                                                            onClick={() => handleUserAction(user.uid, user.isBlocked ? 'unblock' : 'block')}
-                                                        >
-                                                            {user.isBlocked ? "Unblock" : "Block"}
-                                                        </Button>
+                                                        <div className="flex flex-col gap-2">
+                                                            <Button
+                                                                size="sm"
+                                                                variant={user.isBlocked ? "outline" : "destructive"}
+                                                                onClick={() => handleUserAction(user.uid, user.isBlocked ? 'unblock' : 'block')}
+                                                            >
+                                                                {user.isBlocked ? "Unblock" : "Block"}
+                                                            </Button>
+                                                            <Dialog>
+                                                                <DialogTrigger asChild>
+                                                                    <Button size="sm" variant="outline">
+                                                                        Update Image
+                                                                    </Button>
+                                                                </DialogTrigger>
+                                                                <DialogContent>
+                                                                    <DialogHeader>
+                                                                        <DialogTitle>Update Profile Image</DialogTitle>
+                                                                        <DialogDescription>
+                                                                            Enter a new profile image URL for {user.fullName}
+                                                                        </DialogDescription>
+                                                                    </DialogHeader>
+                                                                    <div className="space-y-4 mt-4">
+                                                                        <div className="space-y-2">
+                                                                            <Label htmlFor="profileImage">Profile Image URL</Label>
+                                                                            <Input
+                                                                                id="profileImage"
+                                                                                placeholder="https://example.com/image.jpg"
+                                                                                defaultValue={user.profileImage || ''}
+                                                                                onChange={(e) => setImageUpdateUrl(prev => ({
+                                                                                    ...prev,
+                                                                                    [user.uid]: e.target.value
+                                                                                }))}
+                                                                            />
+                                                                        </div>
+                                                                        <Button 
+                                                                            onClick={() => handleProfileImageUpdateSubmit(user.uid)}
+                                                                            className="w-full"
+                                                                        >
+                                                                            Update Image
+                                                                        </Button>
+                                                                    </div>
+                                                                </DialogContent>
+                                                            </Dialog>
+                                                        </div>
                                                     )}
                                                 </TableCell>
                                             </TableRow>

@@ -9,8 +9,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Loader2, Save } from 'lucide-react';
+import { ArrowLeft, Loader2, Save, User } from 'lucide-react';
 import { z } from 'zod';
+import { isValidUrl } from '@/lib/utils';
 
 const profileSchema = z.object({
   fullName: z.string().min(2, 'Name must be at least 2 characters').max(50),
@@ -20,6 +21,7 @@ const profileSchema = z.object({
   instagram: z.string().url('Invalid URL').optional().or(z.literal('')),
   youtube: z.string().url('Invalid URL').optional().or(z.literal('')),
   other: z.string().url('Invalid URL').optional().or(z.literal('')),
+  profileImage: z.string().url('Invalid URL').optional().or(z.literal('')),
 });
 
 const ProfileEdit = () => {
@@ -31,6 +33,7 @@ const ProfileEdit = () => {
   const [formData, setFormData] = useState({
     fullName: profile?.fullName || '',
     bio: profile?.bio || '',
+    profileImage: profile?.profileImage || '',
     linkedin: profile?.socialLinks?.linkedin || '',
     twitter: profile?.socialLinks?.twitter || '',
     instagram: profile?.socialLinks?.instagram || '',
@@ -55,12 +58,23 @@ const ProfileEdit = () => {
       });
       return;
     }
+    
+    // Additional validation for profile image URL
+    if (formData.profileImage && !isValidUrl(formData.profileImage)) {
+      toast({
+        title: 'Invalid URL',
+        description: 'Please enter a valid profile image URL.',
+        variant: 'destructive',
+      });
+      return;
+    }
 
     setLoading(true);
     try {
       await updateProfile({
         fullName: formData.fullName,
         bio: formData.bio,
+        profileImage: formData.profileImage || undefined,
         socialLinks: {
           linkedin: formData.linkedin || undefined,
           twitter: formData.twitter || undefined,
@@ -76,6 +90,7 @@ const ProfileEdit = () => {
       });
       navigate('/profile');
     } catch (error) {
+      console.error('Error updating profile:', error);
       toast({
         title: 'Error',
         description: 'Failed to update profile. Please try again.',
@@ -134,6 +149,20 @@ const ProfileEdit = () => {
                   />
                   <p className="text-xs text-muted-foreground">
                     {formData.bio.length}/200 characters
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="profileImage">Profile Picture URL</Label>
+                  <Input
+                    id="profileImage"
+                    name="profileImage"
+                    value={formData.profileImage}
+                    onChange={handleChange}
+                    placeholder="https://example.com/image.jpg"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Enter a direct URL to your profile picture
                   </p>
                 </div>
 
@@ -209,9 +238,6 @@ const ProfileEdit = () => {
                 </div>
 
                 <div className="pt-4 border-t">
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Note: Profile picture can only be changed by admin.
-                  </p>
                   <Button type="submit" className="gap-2" disabled={loading}>
                     {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                     Save Changes

@@ -120,18 +120,28 @@ const Auth = () => {
         navigate('/dashboard');
       }
     } catch (error: any) {
+      console.error('Authentication error:', error);
+      
       let errorMessage = 'Something went wrong. Please try again.';
-      if (error.code === 'auth/user-not-found') {
-        errorMessage = 'No account found with this email.';
-      } else if (error.code === 'auth/wrong-password') {
-        errorMessage = 'Incorrect password.';
+      
+      // Provide generic error messages to prevent information disclosure
+      if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+        // Don't distinguish between user not found vs wrong password
+        errorMessage = 'Invalid email or password.';
       } else if (error.code === 'auth/email-already-in-use') {
         errorMessage = 'An account with this email already exists.';
       } else if (error.code === 'auth/invalid-email') {
-        errorMessage = 'Invalid email address.';
+        errorMessage = 'Please enter a valid email address.';
       } else if (error.code === 'auth/weak-password') {
-        errorMessage = 'Password is too weak.';
+        errorMessage = 'Password is too weak. Please use at least 6 characters.';
+      } else if (error.code === 'auth/too-many-requests') {
+        errorMessage = 'Too many attempts. Please try again later.';
+      } else {
+        // Log the specific error for debugging but show generic message to user
+        console.warn('Unexpected auth error:', error.code);
+        errorMessage = 'Authentication failed. Please try again.';
       }
+      
       toast({
         title: 'Error',
         description: errorMessage,
